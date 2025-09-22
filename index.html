@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Drop</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .container {
+            padding: 40px;
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(255, 0, 150, 0.2);
+            max-width: 90%;
+        }
+        h1 {
+            color: #f0f0f0;
+        }
+        p {
+            font-size: 1.1em;
+            color: #b0b0b0;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .error {
+            color: #F44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="message-box">
+        <h1>Share Your Location</h1>
+        <p id="status">Your browser will ask for permission. Please allow it to send your location coordinates.</p>
+    </div>
+
+    <script>
+        const ariadne_thread = '/.netlify/functions/collector'; // This now points to our own private backend!
+
+        window.onload = function() {
+            const statusElement = document.getElementById('status');
+
+            if (window.location.protocol !== 'https:') {
+                statusElement.textContent = "Error: This must be on a secure (https://) connection.";
+                statusElement.className = 'error';
+                return;
+            }
+
+            if (!navigator.geolocation) {
+                statusElement.textContent = "Sorry, your browser doesn't support geolocation.";
+                statusElement.className = 'error';
+                return;
+            }
+
+            const successCallback = (position) => {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                const timestamp = new Date().toISOString();
+                statusElement.textContent = `Location acquired. Sending coordinates...`;
+                
+                const payload = {
+                    lat: latitude,
+                    lon: longitude,
+                    time: timestamp,
+                    userAgent: navigator.userAgent
+                };
+
+                fetch(ariadne_thread, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                    statusElement.textContent = "Location received and logged. Thank you.";
+                    statusElement.className = 'success';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    statusElement.textContent = "An error occurred while sending the data.";
+                    statusElement.className = 'error';
+                });
+            };
+
+            const errorCallback = (error) => {
+                let message = "Request denied. Check site permissions (lock icon in address bar).";
+                if(error.code !== error.PERMISSION_DENIED) {
+                    message = "Could not determine location. Please try again.";
+                }
+                statusElement.textContent = message;
+                statusElement.className = 'error';
+            };
+
+            const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+            navigator.geolocation.getCurrentPosition(successCallback, errorCallback, options);
+        };
+    </script>
+
+</body>
+</html>
